@@ -2,7 +2,7 @@
 
 Macros de audio para Windows 10 (2004 o posterior) y Windows 11 x64.
 
-Documentacion completa: [guia de uso](docs/GUIA_DE_USO.md), [compilacion y versionado](docs/COMPILACION_Y_VERSIONADO.md) y [notas de Trollsound 1.0.4](docs/RELEASE_NOTES_1.0.4.md).
+Documentacion completa: [guia de uso](docs/GUIA_DE_USO.md), [compilacion y versionado](docs/COMPILACION_Y_VERSIONADO.md) y [notas de Trollsound 1.0.5](docs/RELEASE_NOTES_1.0.5.md).
 
 ## Uso
 
@@ -12,7 +12,7 @@ Selecciona `CABLE Input (VB-Audio Virtual Cable)` en Trollsound y pulsa **Probar
 
 Agrega una macro con nombre, combinacion y archivo WAV, MP3, OGG o FLAC. El archivo se valida y copia a `%LOCALAPPDATA%\Trollsound\audio`. Al activarse, el clip reemplaza al anterior sin cortar el microfono. Hay volumen independiente para voz, sonido enviado al juego y escucha local. La escucha local contiene solo el clip, nunca el microfono; usa auriculares para evitar que el microfono vuelva a captar el sonido de los altavoces. Windows reserva cada combinacion para Trollsound y la activa al presionarla, sin repeticion por mantenerla pulsada. Cerrar la ventana la deja en la bandeja y tanto el puente como los atajos siguen activos; **Salir** los libera. No hay arranque automatico con Windows.
 
-En **Configuracion** se muestra el nombre del programa, la version, el creador y el acceso para donar mediante Cafecito. Alli tambien puede asignarse una combinacion global para **Detener audio**; corta solamente el clip en reproduccion y mantiene abierto el microfono.
+En **Configuracion** se muestra el nombre del programa, la version, el creador y el acceso para donar mediante Cafecito. Alli tambien puede asignarse una combinacion global para **Detener audio** y exportar o importar todas las macros junto con sus sonidos mediante un ZIP portable.
 
 La pausa libera temporalmente los atajos y detiene clips, pero mantiene el paso del microfono. El boton de reproduccion sigue disponible para una prueba manual. La columna Estado muestra si cada macro esta registrada, pausada, desactivada, en conflicto o necesita otra combinacion. Si falla el microfono o se desconecta el cable, la mezcla y las macros se detienen para impedir una ruta incompleta.
 
@@ -26,7 +26,7 @@ Requiere Python 3.12 x64 e Inno Setup 6.7.3 en Windows. Ejecuta:
 .\scripts\build.ps1 -Python 'C:\ruta\python.exe' -InnoCompiler 'C:\ruta\ISCC.exe'
 ```
 
-Las dependencias estan fijadas en `requirements-build.txt`. El resultado queda en `dist\Trollsound-Setup-x64.exe`; el bundle portatil `dist\Trollsound` debe conservarse completo. La entrega para publicar queda en `release\Trollsound-v1.0.4`. El instalador es sin firma; Windows puede mostrar SmartScreen. No se incluye un certificado privado.
+Las dependencias estan fijadas en `requirements-build.txt`. El resultado queda en `dist\Trollsound-Setup-x64.exe`; el bundle portatil `dist\Trollsound` debe conservarse completo. La entrega para publicar queda en `release\Trollsound-v1.0.5`. El instalador es sin firma; Windows puede mostrar SmartScreen. No se incluye un certificado privado.
 
 Para desarrollo: `.\.venv\Scripts\python.exe launcher.py`. Pruebas: `.\.venv\Scripts\python.exe -m pytest -q`.
 

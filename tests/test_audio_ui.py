@@ -3,7 +3,7 @@ from array import array
 import pytest
 from PyQt6.QtCore import QByteArray, QObject, pyqtSignal
 from PyQt6.QtMultimedia import QAudio, QAudioFormat
-from PyQt6.QtWidgets import QLabel, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QLabel, QMessageBox
 from trollsound.audio import MixerDevice, Player, Validator, tone_pcm, tone_detected
 from trollsound.devices import device_id
 from trollsound.storage import Library
@@ -247,6 +247,62 @@ def test_settings_persists_stop_hotkey_and_shows_product(window, qtbot):
     restored = Library(window.library.root)
     assert restored.stop_hotkey == "Ctrl+Alt+X"
     assert "Trollsound" in [label.text() for label in dialog.findChildren(QLabel)]
+
+
+def test_settings_exports_and_imports_after_confirmation(window, qtbot, wav, tmp_path, monkeypatch):
+    window.library.put("Actual", "Ctrl+9", wav)
+    exported = tmp_path / "exported.zip"
+    dialog = SettingsDialog(window.library, parent=window)
+    qtbot.addWidget(dialog)
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", lambda *args: (str(exported), ""))
+    dialog.export_package()
+    assert exported.is_file() and "exportados" in dialog.message.text()
+
+    replacement = Library(tmp_path / "replacement")
+    replacement.put("Importada", "Ctrl+1", wav)
+    replacement.set_stop_hotkey("Ctrl+Alt+X")
+    package = tmp_path / "replacement.zip"
+    replacement.export_package(package)
+    monkeypatch.setattr(QFileDialog, "getOpenFileName", lambda *args: (str(package), ""))
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.No)
+    dialog.import_package()
+    assert [macro.name for macro in window.library.macros] == ["Actual"]
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
+    monkeypatch.setattr(QMessageBox, "information", lambda *args: QMessageBox.StandardButton.Ok)
+    dialog.import_package()
+    assert dialog.imported
+    assert [macro.name for macro in window.library.macros] == ["Importada"]
+    assert window.library.stop_hotkey == "Ctrl+Alt+X"
+
+
+def test_window_refreshes_and_stops_after_settings_import(window, wav, tmp_path, monkeypatch):
+    replacement = Library(tmp_path / "replacement")
+    replacement.put("Importada", "Ctrl+1", wav)
+    replacement.set_stop_hotkey("Ctrl+Alt+X")
+    package = tmp_path / "replacement.zip"
+    replacement.export_package(package)
+    stop = MagicMock()
+    monkeypatch.setattr(window.player, "stop_clip", stop)
+
+    class ImportedSettings:
+        def __init__(self, library, *args, **kwargs):
+            library.import_package(package)
+            self.imported = True
+
+        def exec(self):
+            return 0
+
+        def deleteLater(self):
+            pass
+
+    monkeypatch.setattr("trollsound.ui.SettingsDialog", ImportedSettings)
+    window.open_settings()
+
+    assert window.table.rowCount() == 1
+    assert window.table.item(0, 0).text() == "Importada"
+    assert window.hotkeys.statuses[STOP_ACTION_ID] == "Registrada"
+    stop.assert_called_once()
 
 
 def test_stop_hotkey_stops_only_clip(window, monkeypatch):

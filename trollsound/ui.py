@@ -132,6 +132,7 @@ class SettingsDialog(QDialog):
     def __init__(self, library, stop_status="", stop_detail="", parent=None):
         super().__init__(parent)
         self.library = library
+        self.imported = False
         self.setWindowTitle("Configuracion")
         self.setMinimumWidth(480)
         layout = QVBoxLayout(self)
@@ -146,6 +147,15 @@ class SettingsDialog(QDialog):
         self.stop_state.setToolTip(stop_detail)
         self.stop_state.setWordWrap(True)
         layout.addWidget(self.stop_state)
+        package_buttons = QHBoxLayout()
+        self.export_button = QPushButton("Exportar atajos")
+        self.export_button.clicked.connect(self.export_package)
+        package_buttons.addWidget(self.export_button)
+        self.import_button = QPushButton("Importar atajos")
+        self.import_button.clicked.connect(self.import_package)
+        self.import_button.setEnabled(not library.read_only)
+        package_buttons.addWidget(self.import_button)
+        form.addRow("Copia portable", package_buttons)
         donate = QPushButton("Donar con Cafecito")
         donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(DONATION_URL)))
         layout.addWidget(donate)
@@ -159,6 +169,48 @@ class SettingsDialog(QDialog):
         buttons.accepted.connect(self.submit)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
+
+    def export_package(self):
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar atajos", "Trollsound-atajos.zip", "Paquete de atajos (*.zip)")
+        if not path:
+            return
+        destination = Path(path)
+        if destination.suffix.lower() != ".zip":
+            destination = destination.with_suffix(".zip")
+        try:
+            self.library.export_package(destination)
+            self.message.setText(f"Atajos exportados en {destination}")
+        except (OSError, ValueError) as exc:
+            self.message.setText(str(exc))
+
+    def import_package(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Importar atajos", "", "Paquete de atajos (*.zip)")
+        if not path:
+            return
+        try:
+            summary = self.library.inspect_package(Path(path))
+            answer = QMessageBox.question(
+                self,
+                "Importar atajos",
+                f"El paquete contiene {summary.macro_count} macros. "
+                f"Se reemplazaran las {len(self.library.macros)} macros actuales y el atajo de detener audio. "
+                "Esta accion no modifica VB-Cable ni los volumenes. Continuar?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self.library.import_package(Path(path))
+            self.stop_combo.setText(self.library.stop_hotkey)
+            self.imported = True
+            QMessageBox.information(
+                self, "Importar atajos",
+                f"Se importaron {summary.macro_count} macros correctamente.")
+            self.accept()
+        except (OSError, ValueError) as exc:
+            self.message.setText(str(exc))
 
     def submit(self):
         try:
@@ -481,8 +533,12 @@ class Window(QMainWindow):
         self.sync_hotkeys()
         dialog = SettingsDialog(self.library, status, detail, self)
         dialog.exec()
+        imported = dialog.imported
         dialog.deleteLater()
         self.editing = False
+        if imported:
+            self.stop_audio()
+            self.refresh_table()
         self.sync_hotkeys()
 
     def edit_macro(self, _checked=False, new=False):

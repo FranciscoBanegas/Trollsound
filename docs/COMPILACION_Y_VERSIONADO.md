@@ -130,11 +130,11 @@ Para preparar una version, actualiza de forma coherente:
 Busca residuos de la version anterior antes del build:
 
 ```powershell
-rg -n "1\.0\.4|schema_version" . `
+rg -n "1\.0\.5|schema_version" . `
   -g '!dist/**' -g '!build/**' -g '!release/**' -g '!.venv/**'
 ```
 
-Sustituye `1.0.4` por la version que estas retirando. Revisa cada coincidencia: no cambies historiales de migracion o notas antiguas que deban conservarse.
+Sustituye `1.0.5` por la version que estas retirando. Revisa cada coincidencia: no cambies historiales de migracion o notas antiguas que deban conservarse.
 
 ## Lista de publicacion
 
@@ -162,7 +162,7 @@ Sustituye `1.0.4` por la version que estas retirando. Revisa cada coincidencia: 
 9. Verifica los hashes publicados:
 
 ```powershell
-Get-FileHash .\release\Trollsound-v1.0.4\Trollsound-Setup-v1.0.4-x64.exe -Algorithm SHA256
+Get-FileHash .\release\Trollsound-v1.0.5\Trollsound-Setup-v1.0.5-x64.exe -Algorithm SHA256
 ```
 
 10. Publica todos los archivos de `release\Trollsound-v<version>` y marca el instalador `.exe` como descarga recomendada.

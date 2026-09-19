@@ -1,4 +1,4 @@
-# Guia de uso de Trollsound 1.0.4
+# Guia de uso de Trollsound 1.0.5
 
 ## Que hace Trollsound
 
@@ -21,7 +21,7 @@ No es necesario instalar Python para usar el instalador.
 
 ## Instalacion
 
-1. Ejecuta `Trollsound-Setup-v1.0.4-x64.exe` como administrador.
+1. Ejecuta `Trollsound-Setup-v1.0.5-x64.exe` como administrador.
 2. Si SmartScreen aparece porque el instalador no esta firmado, revisa que el SHA-256 coincida con `SHA256SUMS.txt`, selecciona **Mas informacion** y luego **Ejecutar de todas formas**.
 3. Si VB-Cable no esta listo, acepta abrir el flujo oficial de VB-Audio. Completa su asistente visible y reinicia Windows.
 4. Vuelve a abrir Trollsound despues del reinicio.
@@ -73,6 +73,12 @@ Si el sistema no ofrece bandeja, cerrar la ventana termina la aplicacion limpiam
 Pulsa **Configuracion** en la ventana principal o en el menu de bandeja. El dialogo muestra el nombre Trollsound, la version instalada y el creador, Francisco Banegas. **Donar con Cafecito** abre `https://cafecito.app/franciscobanegas` en el navegador predeterminado.
 
 En el mismo dialogo puedes capturar una combinacion global para **Detener audio**. El atajo permanece disponible con la ventana minimizada y, al activarse, detiene el clip actual sin cortar el puente del microfono. Puede dejarse vacio para deshabilitarlo. No puede coincidir con una macro ni con combinaciones reservadas por Windows.
+
+## Copias portables de atajos
+
+Desde **Configuracion**, pulsa **Exportar atajos** para crear un ZIP con todas las macros, sus estados, combinaciones, audios y el atajo global de detencion. El paquete contiene un `manifest.json` y una copia verificada de cada sonido, por lo que puede trasladarse a otro equipo sin depender de las rutas originales.
+
+**Importar atajos** valida primero la estructura y la integridad completa del paquete. Tras la confirmacion, reemplaza las macros y el atajo de detencion actuales; no cambia el cable seleccionado, los volumenes ni la preferencia de bandeja. Si el paquete esta dañado o falla el guardado, la biblioteca existente permanece intacta.
 
 ## Estados de una macro
 

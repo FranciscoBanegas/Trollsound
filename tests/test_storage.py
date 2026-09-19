@@ -1,6 +1,10 @@
 import json
+import hashlib
+import os
+import zipfile
+from pathlib import Path
 import pytest
-from trollsound.storage import Library
+from trollsound.storage import Library, Macro
 
 
 def test_import_survives_original_deleted_and_persists(tmp_path, wav):
@@ -128,3 +132,105 @@ def test_stop_hotkey_rejects_existing_macro(tmp_path, wav):
     lib.put("Uno", "Ctrl+Alt+X", wav)
     with pytest.raises(ValueError):
         lib.set_stop_hotkey("Ctrl+Alt+X")
+
+
+def test_package_round_trip_preserves_macros_shared_audio_and_stop_hotkey(tmp_path, wav):
+    source = Library(tmp_path / "source")
+    first = source.put("Uno", "Ctrl+1", wav)
+    source.macros.append(Macro("second", "Dos", "Alt+2", first.audio, False))
+    source.set_stop_hotkey("Ctrl+Alt+X")
+    package = tmp_path / "atajos.zip"
+
+    source.export_package(package)
+    with zipfile.ZipFile(package) as archive:
+        manifest = json.loads(archive.read("manifest.json"))
+        assert len(manifest["audio_files"]) == 1
+        assert len(archive.namelist()) == 2
+    source.path(first).unlink()
+
+    destination = Library(tmp_path / "destination")
+    old = destination.put("Anterior", "Ctrl+9", wav)
+    destination.selected_device_id = "local-cable"
+    destination.cable_volume = 42
+    summary = destination.inspect_package(package)
+    destination.import_package(package)
+
+    assert summary.macro_count == 2 and summary.stop_hotkey == "Ctrl+Alt+X"
+    assert [(m.id, m.name, m.hotkey, m.enabled) for m in destination.macros] == [
+        (first.id, "Uno", "Ctrl+1", True), ("second", "Dos", "Alt+2", False)]
+    assert destination.macros[0].audio == destination.macros[1].audio
+    assert destination.path(destination.macros[0]).read_bytes() == wav.read_bytes()
+    assert destination.stop_hotkey == "Ctrl+Alt+X"
+    assert destination.selected_device_id == "local-cable" and destination.cable_volume == 42
+    assert not destination.path(old).exists()
+
+
+def write_package(path, manifest, files=None):
+    with zipfile.ZipFile(path, "w") as archive:
+        archive.writestr("manifest.json", json.dumps(manifest))
+        for name, content in (files or {}).items():
+            archive.writestr(name, content)
+
+
+def package_manifest(audio=b"sound", **changes):
+    digest = hashlib.sha256(audio).hexdigest()
+    path = f"audio/{digest}.wav"
+    manifest = {
+        "package_version": 1,
+        "app_version": "1.0.5",
+        "stop_hotkey": "Ctrl+Alt+X",
+        "macros": [{"id": "one", "name": "Uno", "hotkey": "Ctrl+1",
+                    "audio": path, "enabled": True}],
+        "audio_files": [{"path": path, "size": len(audio), "sha256": digest}],
+    }
+    manifest.update(changes)
+    return manifest, {path: audio}
+
+
+@pytest.mark.parametrize("variant", ["corrupt", "traversal", "hash", "duplicate_hotkey", "missing"])
+def test_invalid_packages_are_rejected_without_changes(tmp_path, wav, variant):
+    library = Library(tmp_path / "library")
+    original = library.put("Original", "Ctrl+9", wav)
+    package = tmp_path / "invalid.zip"
+    manifest, files = package_manifest()
+    if variant == "corrupt":
+        package.write_bytes(b"not a zip")
+    elif variant == "traversal":
+        write_package(package, manifest, {**files, "../outside.wav": b"bad"})
+    elif variant == "hash":
+        files[next(iter(files))] = b"changed"
+        write_package(package, manifest, files)
+    elif variant == "duplicate_hotkey":
+        manifest["macros"].append({**manifest["macros"][0], "id": "two"})
+        write_package(package, manifest, files)
+    else:
+        write_package(package, manifest)
+
+    with pytest.raises(ValueError):
+        library.inspect_package(package)
+    assert library.macros == [original] and library.path(original).is_file()
+    assert not (tmp_path / "outside.wav").exists()
+
+
+def test_import_rolls_back_copied_audio_when_config_save_fails(tmp_path, wav, monkeypatch):
+    source = Library(tmp_path / "source")
+    source.put("Nueva", "Ctrl+1", wav)
+    package = tmp_path / "atajos.zip"
+    source.export_package(package)
+    destination = Library(tmp_path / "destination")
+    original = destination.put("Original", "Ctrl+9", wav)
+    existing_files = set(destination.audio_dir.iterdir())
+    real_replace = os.replace
+
+    def fail_config(source_path, destination_path):
+        if Path(destination_path) == destination.config:
+            raise OSError("disk full")
+        return real_replace(source_path, destination_path)
+
+    monkeypatch.setattr("trollsound.storage.os.replace", fail_config)
+    with pytest.raises(ValueError, match="disk full"):
+        destination.import_package(package)
+
+    assert destination.macros == [original]
+    assert set(destination.audio_dir.iterdir()) == existing_files
+    assert Library(destination.root).macros == [original]
