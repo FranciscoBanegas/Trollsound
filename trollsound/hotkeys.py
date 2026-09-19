@@ -15,6 +15,8 @@ MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_NOREPEAT = 0x4000
 FIRST_HOTKEY_ID = 0x1000
+STOP_HOTKEY_ID = FIRST_HOTKEY_ID - 1
+STOP_ACTION_ID = "__stop_audio__"
 DEBOUNCE_NS = 75_000_000
 
 _ALIASES = {
@@ -202,7 +204,7 @@ class Hotkeys(QObject):
         self.statuses.clear()
         self.status_details.clear()
 
-    def register(self, macros):
+    def register(self, macros, stop_hotkey=""):
         self.clear()
         generation = self.generation
         if not self.hwnd:
@@ -210,6 +212,24 @@ class Hotkeys(QObject):
                 self.statuses[macro.id] = "Error de registro"
                 self.status_details[macro.id] = "La ventana nativa aun no esta disponible"
             return
+        if stop_hotkey:
+            try:
+                parsed = parse_hotkey(stop_hotkey, self.api)
+                ok, error = self.api.register(self.hwnd, STOP_HOTKEY_ID,
+                                              parsed.modifiers, parsed.virtual_key)
+                if ok:
+                    self.handles[STOP_HOTKEY_ID] = (STOP_ACTION_ID, generation)
+                    self.statuses[STOP_ACTION_ID] = "Registrada"
+                    self.status_details[STOP_ACTION_ID] = parsed.canonical
+                else:
+                    self.statuses[STOP_ACTION_ID] = "Conflicto"
+                    self.status_details[STOP_ACTION_ID] = (
+                        "Windows rechazo la combinacion de detener audio; "
+                        f"probablemente ya esta en uso (error {error})")
+                    logging.warning("Atajo de detencion rechazado; error Win32 %s", error)
+            except ValueError as exc:
+                self.statuses[STOP_ACTION_ID] = "Reasignar teclas"
+                self.status_details[STOP_ACTION_ID] = str(exc)
         for offset, macro in enumerate(macros):
             identifier = FIRST_HOTKEY_ID + offset
             try:
@@ -240,7 +260,10 @@ class Hotkeys(QObject):
         macro_id, generation = registered
         if generation != self.generation:
             return
-        logging.info("Macro activada: %s", macro_id)
+        if macro_id == STOP_ACTION_ID:
+            logging.info("Atajo de detencion activado")
+        else:
+            logging.info("Macro activada: %s", macro_id)
         self.triggered.emit(macro_id, generation)
 
     def close(self):

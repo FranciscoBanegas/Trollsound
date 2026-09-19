@@ -1,4 +1,4 @@
-# Guia de uso de Trollsound 1.0.3
+# Guia de uso de Trollsound 1.0.4
 
 ## Que hace Trollsound
 
@@ -21,7 +21,7 @@ No es necesario instalar Python para usar el instalador.
 
 ## Instalacion
 
-1. Ejecuta `Trollsound-Setup-v1.0.3-x64.exe` como administrador.
+1. Ejecuta `Trollsound-Setup-v1.0.4-x64.exe` como administrador.
 2. Si SmartScreen aparece porque el instalador no esta firmado, revisa que el SHA-256 coincida con `SHA256SUMS.txt`, selecciona **Mas informacion** y luego **Ejecutar de todas formas**.
 3. Si VB-Cable no esta listo, acepta abrir el flujo oficial de VB-Audio. Completa su asistente visible y reinicia Windows.
 4. Vuelve a abrir Trollsound despues del reinicio.
@@ -67,6 +67,12 @@ Minimizar o cerrar la ventana mantiene Trollsound en la bandeja, conserva el pue
 - **Salir** detiene el puente, libera los atajos y termina el proceso.
 
 Si el sistema no ofrece bandeja, cerrar la ventana termina la aplicacion limpiamente.
+
+## Configuracion, creador y donaciones
+
+Pulsa **Configuracion** en la ventana principal o en el menu de bandeja. El dialogo muestra el nombre Trollsound, la version instalada y el creador, Francisco Banegas. **Donar con Cafecito** abre `https://cafecito.app/franciscobanegas` en el navegador predeterminado.
+
+En el mismo dialogo puedes capturar una combinacion global para **Detener audio**. El atajo permanece disponible con la ventana minimizada y, al activarse, detiene el clip actual sin cortar el puente del microfono. Puede dejarse vacio para deshabilitarlo. No puede coincidir con una macro ni con combinaciones reservadas por Windows.
 
 ## Estados de una macro
 

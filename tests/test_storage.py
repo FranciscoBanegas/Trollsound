@@ -74,7 +74,7 @@ def test_schema_one_migrates_with_default_volumes(tmp_path):
     lib.cable_volume, lib.monitor_volume, lib.microphone_volume = 65, 35, 90
     lib.save()
     saved = json.loads(lib.config.read_text(encoding="utf-8"))
-    assert saved["schema_version"] == 3
+    assert saved["schema_version"] == 4
     assert (saved["cable_volume"], saved["monitor_volume"]) == (65, 35)
     assert saved["microphone_volume"] == 90
     restored = Library(root)
@@ -97,6 +97,7 @@ def test_schema_two_migrates_microphone_volume(tmp_path):
     (tmp_path / "config.json").write_text(json.dumps(data), encoding="utf-8")
     lib = Library(tmp_path)
     assert (lib.cable_volume, lib.monitor_volume, lib.microphone_volume) == (70, 30, 100)
+    assert lib.stop_hotkey == ""
 
 
 @pytest.mark.parametrize("value", [-1, 101, True])
@@ -105,3 +106,25 @@ def test_schema_three_rejects_invalid_microphone_volume(tmp_path, value):
             "cable_volume": 80, "monitor_volume": 80, "microphone_volume": value, "macros": []}
     (tmp_path / "config.json").write_text(json.dumps(data), encoding="utf-8")
     assert Library(tmp_path).read_only
+
+
+def test_schema_three_migrates_and_persists_stop_hotkey(tmp_path, wav):
+    data = {"schema_version": 3, "selected_device_id": "", "minimize_to_tray": True,
+            "cable_volume": 80, "monitor_volume": 80, "microphone_volume": 95,
+            "macros": []}
+    (tmp_path / "config.json").write_text(json.dumps(data), encoding="utf-8")
+    lib = Library(tmp_path)
+    lib.set_stop_hotkey("Ctrl+Alt+X")
+
+    restored = Library(tmp_path)
+    assert restored.stop_hotkey == "Ctrl+Alt+X"
+    assert json.loads(lib.config.read_text(encoding="utf-8"))["schema_version"] == 4
+    with pytest.raises(ValueError):
+        restored.put("Conflicto", "Ctrl+Alt+X", wav)
+
+
+def test_stop_hotkey_rejects_existing_macro(tmp_path, wav):
+    lib = Library(tmp_path / "library")
+    lib.put("Uno", "Ctrl+Alt+X", wav)
+    with pytest.raises(ValueError):
+        lib.set_stop_hotkey("Ctrl+Alt+X")

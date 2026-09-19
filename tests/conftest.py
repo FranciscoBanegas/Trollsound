@@ -86,11 +86,15 @@ class FakeHotkeys(QObject):
         self.statuses = {}
         self.status_details = {}
 
-    def register(self, macros):
+    def register(self, macros, stop_hotkey=""):
         self.clear()
         self.registered = list(macros)
         self.statuses = {macro.id: "Registrada" for macro in macros}
         self.status_details = {macro.id: macro.hotkey for macro in macros}
+        if stop_hotkey:
+            from trollsound.hotkeys import STOP_ACTION_ID
+            self.statuses[STOP_ACTION_ID] = "Registrada"
+            self.status_details[STOP_ACTION_ID] = stop_hotkey
 
     def close(self):
         self.clear()

@@ -31,6 +31,7 @@ class Library:
         self.cable_volume = 80
         self.monitor_volume = 80
         self.microphone_volume = 100
+        self.stop_hotkey = ""
         self.load_error = ""
         self.read_only = False
         self.load()
@@ -48,7 +49,7 @@ class Library:
             return
         try:
             data = json.loads(self.config.read_text(encoding="utf-8"))
-            if data.get("schema_version") not in (1, 2, 3):
+            if data.get("schema_version") not in (1, 2, 3, 4):
                 raise ValueError("Version de configuracion no compatible")
             macros = [Macro(**m) for m in data["macros"]]
             ids, hotkeys = set(), set()
@@ -69,7 +70,7 @@ class Library:
             self.macros = macros
             self.selected_device_id = selected
             self.minimize_to_tray = bool(data.get("minimize_to_tray", True))
-            if data["schema_version"] in (2, 3):
+            if data["schema_version"] in (2, 3, 4):
                 cable_volume = data.get("cable_volume", 80)
                 monitor_volume = data.get("monitor_volume", 80)
                 if (type(cable_volume) is not int or not 0 <= cable_volume <= 100 or
@@ -82,6 +83,15 @@ class Library:
                 if type(microphone_volume) is not int or not 0 <= microphone_volume <= 100:
                     raise ValueError("Volumen de microfono no valido")
                 self.microphone_volume = microphone_volume
+            if data["schema_version"] == 4:
+                microphone_volume = data.get("microphone_volume", 100)
+                stop_hotkey = data.get("stop_hotkey", "")
+                if type(microphone_volume) is not int or not 0 <= microphone_volume <= 100:
+                    raise ValueError("Volumen de microfono no valido")
+                if not isinstance(stop_hotkey, str) or stop_hotkey in hotkeys:
+                    raise ValueError("Atajo de detencion no valido o duplicado")
+                self.microphone_volume = microphone_volume
+                self.stop_hotkey = stop_hotkey
         except (ValueError, TypeError, KeyError, OSError) as exc:
             self.load_error = f"No se pudo leer la biblioteca: {exc}. Se conserva el archivo original."
             self.read_only = True
@@ -89,10 +99,11 @@ class Library:
     def save(self):
         if self.read_only:
             raise ValueError(self.load_error)
-        data = dict(schema_version=3, selected_device_id=self.selected_device_id,
+        data = dict(schema_version=4, selected_device_id=self.selected_device_id,
                     minimize_to_tray=self.minimize_to_tray,
                     cable_volume=self.cable_volume, monitor_volume=self.monitor_volume,
                     microphone_volume=self.microphone_volume,
+                    stop_hotkey=self.stop_hotkey,
                     macros=[asdict(m) for m in self.macros])
         temp = self.config.with_suffix(".tmp")
         try:
@@ -111,6 +122,8 @@ class Library:
             raise ValueError("Completa el nombre y la combinacion")
         if any(m.hotkey == hotkey and m.id != existing_id for m in self.macros):
             raise ValueError("Esta combinacion ya pertenece a otra macro")
+        if hotkey == self.stop_hotkey:
+            raise ValueError("Esta combinacion se usa para detener el audio")
         if source.suffix.lower() not in EXTENSIONS or not source.is_file():
             raise ValueError("Selecciona un archivo WAV, MP3, OGG o FLAC existente")
         previous = next((m for m in self.macros if m.id == existing_id), None)
@@ -140,6 +153,19 @@ class Library:
         if previous and copied:
             self._remove_unused(previous)
         return macro
+
+    def set_stop_hotkey(self, hotkey: str):
+        if self.read_only:
+            raise ValueError(self.load_error)
+        if hotkey and any(m.hotkey == hotkey for m in self.macros):
+            raise ValueError("Esta combinacion ya pertenece a una macro")
+        previous = self.stop_hotkey
+        self.stop_hotkey = hotkey
+        try:
+            self.save()
+        except Exception:
+            self.stop_hotkey = previous
+            raise
 
     def _remove_unused(self, macro):
         if not any(m.audio == macro.audio for m in self.macros):

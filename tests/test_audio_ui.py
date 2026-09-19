@@ -3,11 +3,12 @@ from array import array
 import pytest
 from PyQt6.QtCore import QByteArray, QObject, pyqtSignal
 from PyQt6.QtMultimedia import QAudio, QAudioFormat
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QLabel, QMessageBox
 from trollsound.audio import MixerDevice, Player, Validator, tone_pcm, tone_detected
 from trollsound.devices import device_id
 from trollsound.storage import Library
-from trollsound.ui import Window, MacroDialog
+from trollsound.hotkeys import STOP_ACTION_ID
+from trollsound.ui import Window, MacroDialog, SettingsDialog
 from test_devices_hotkeys import Device
 import subprocess
 import imageio_ffmpeg
@@ -235,6 +236,27 @@ def test_volume_controls_persist_independently(window, qtbot):
     window.persist_volumes()
     restored = Library(window.library.root)
     assert (restored.microphone_volume, restored.cable_volume, restored.monitor_volume) == (91, 61, 27)
+
+
+def test_settings_persists_stop_hotkey_and_shows_product(window, qtbot):
+    dialog = SettingsDialog(window.library, parent=window)
+    qtbot.addWidget(dialog)
+    dialog.stop_combo.setText("Ctrl+Alt+X")
+    dialog.submit()
+
+    restored = Library(window.library.root)
+    assert restored.stop_hotkey == "Ctrl+Alt+X"
+    assert "Trollsound" in [label.text() for label in dialog.findChildren(QLabel)]
+
+
+def test_stop_hotkey_stops_only_clip(window, monkeypatch):
+    stop = MagicMock()
+    monkeypatch.setattr(window.player, "stop_clip", stop)
+    generation = window.hotkeys.generation
+
+    window.trigger(STOP_ACTION_ID, generation)
+
+    stop.assert_called_once()
 
 
 @pytest.fixture

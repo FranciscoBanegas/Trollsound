@@ -1,4 +1,4 @@
-#define AppVersion "1.0.3"
+#define AppVersion "1.0.4"
 [Setup]
 AppId={{D772CB63-E6AF-42F5-888C-33DD60A7C854}
 AppName=Trollsound

@@ -2,7 +2,7 @@ from pathlib import Path
 import logging
 
 from PyQt6.QtCore import Qt, QTimer, QUrl
-from PyQt6.QtGui import QKeySequence
+from PyQt6.QtGui import QDesktopServices, QKeySequence
 from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
     QFileDialog, QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QMainWindow,
     QKeySequenceEdit, QMenu, QMessageBox, QPushButton, QSlider, QStyle, QSystemTrayIcon, QTableWidget,
@@ -10,8 +10,12 @@ from PyQt6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialo
 
 from .audio import Diagnostic, Player, Validator
 from .devices import Devices
-from .hotkeys import Hotkeys, normalize_hotkey
+from .hotkeys import STOP_ACTION_ID, Hotkeys, normalize_hotkey
 from .storage import Library
+from . import __version__
+
+DONATION_URL = "https://cafecito.app/franciscobanegas"
+CREATOR_NAME = "Francisco Banegas"
 
 
 class HotkeyEdit(QKeySequenceEdit):
@@ -124,6 +128,48 @@ class MacroDialog(QDialog):
         self.validator.cancel()
 
 
+class SettingsDialog(QDialog):
+    def __init__(self, library, stop_status="", stop_detail="", parent=None):
+        super().__init__(parent)
+        self.library = library
+        self.setWindowTitle("Configuracion")
+        self.setMinimumWidth(480)
+        layout = QVBoxLayout(self)
+        form = QFormLayout()
+        form.addRow("Programa", QLabel("Trollsound"))
+        form.addRow("Version", QLabel(__version__))
+        form.addRow("Creador", QLabel(CREATOR_NAME))
+        self.stop_combo = HotkeyEdit(library.stop_hotkey)
+        form.addRow("Detener audio", self.stop_combo)
+        layout.addLayout(form)
+        self.stop_state = QLabel("Estado del atajo: " + (stop_status or "Sin asignar"))
+        self.stop_state.setToolTip(stop_detail)
+        self.stop_state.setWordWrap(True)
+        layout.addWidget(self.stop_state)
+        donate = QPushButton("Donar con Cafecito")
+        donate.clicked.connect(lambda: QDesktopServices.openUrl(QUrl(DONATION_URL)))
+        layout.addWidget(donate)
+        self.message = QLabel("")
+        self.message.setWordWrap(True)
+        layout.addWidget(self.message)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save |
+                                   QDialogButtonBox.StandardButton.Cancel)
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText("Guardar")
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
+        buttons.accepted.connect(self.submit)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def submit(self):
+        try:
+            text = self.stop_combo.text().strip()
+            hotkey = normalize_hotkey(text) if text else ""
+            self.library.set_stop_hotkey(hotkey)
+            self.accept()
+        except (OSError, ValueError) as exc:
+            self.message.setText(str(exc))
+
+
 class Window(QMainWindow):
     def __init__(self, library=None, devices=None, hotkeys=None):
         super().__init__()
@@ -156,6 +202,10 @@ class Window(QMainWindow):
         title.setStyleSheet("font-size: 24px; font-weight: 600; color: #146B61;")
         top.addWidget(title)
         top.addStretch()
+        self.settings_button = QPushButton("Configuracion")
+        self.settings_button.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.settings_button.clicked.connect(self.open_settings)
+        top.addWidget(self.settings_button)
         self.pause = QCheckBox("Pausar macros")
         self.pause.toggled.connect(self.set_paused)
         top.addWidget(self.pause)
@@ -240,6 +290,7 @@ class Window(QMainWindow):
         self.tray.setToolTip("Trollsound")
         menu = QMenu(self)
         menu.addAction("Abrir Trollsound", self.reveal)
+        menu.addAction("Configuracion", self.open_settings)
         self.pause_action = menu.addAction("Pausar macros")
         self.pause_action.setCheckable(True)
         self.pause_action.toggled.connect(self.pause.setChecked)
@@ -387,7 +438,9 @@ class Window(QMainWindow):
         active = (not self.paused and not self.editing and not self.diagnostic.running
                   and not self.library.read_only and self.player.bridge_ready)
         macros = [m for m in self.library.macros if m.enabled and self.library.path(m).is_file()] if active else []
-        self.hotkeys.register(macros)
+        stop_hotkey = (self.library.stop_hotkey if not self.editing and not self.diagnostic.running
+                       and not self.library.read_only else "")
+        self.hotkeys.register(macros, stop_hotkey)
         self.update_macro_states()
 
     def update_macro_states(self):
@@ -399,7 +452,12 @@ class Window(QMainWindow):
                 item.setToolTip(detail)
 
     def trigger(self, macro_id, generation):
-        if generation != self.hotkeys.generation or self.paused or self.editing or self.diagnostic.running:
+        if generation != self.hotkeys.generation:
+            return
+        if macro_id == STOP_ACTION_ID:
+            self.stop_audio()
+            return
+        if self.paused or self.editing or self.diagnostic.running:
             return
         macro = next((m for m in self.library.macros if m.id == macro_id and m.enabled), None)
         if macro:
@@ -412,6 +470,19 @@ class Window(QMainWindow):
         self.pause_action.blockSignals(False)
         if value:
             self.stop_audio()
+        self.sync_hotkeys()
+
+    def open_settings(self):
+        if self.editing:
+            return
+        status = self.hotkeys.statuses.get(STOP_ACTION_ID, "Sin asignar")
+        detail = self.hotkeys.status_details.get(STOP_ACTION_ID, "")
+        self.editing = True
+        self.sync_hotkeys()
+        dialog = SettingsDialog(self.library, status, detail, self)
+        dialog.exec()
+        dialog.deleteLater()
+        self.editing = False
         self.sync_hotkeys()
 
     def edit_macro(self, _checked=False, new=False):

@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import QApplication
 from trollsound.audio import tone_pcm
 from trollsound.devices import Devices
 from trollsound.storage import Library
-from trollsound.ui import Window, MacroDialog
+from trollsound.ui import Window, MacroDialog, SettingsDialog
 from trollsound.hotkeys import Hotkeys
 from trollsound.theme import apply_theme
 
@@ -41,6 +41,12 @@ def main():
         app.processEvents()
         dialog.grab().save(str(directory / "macro-dialog.png"))
         dialog.reject()
+        settings = SettingsDialog(library, "Registrada", "Ctrl+Alt+X", window)
+        settings.stop_combo.setText("Ctrl+Alt+X")
+        settings.show()
+        app.processEvents()
+        settings.grab().save(str(directory / "settings-dialog.png"))
+        settings.reject()
         window.quitting = True
         window.close()
 

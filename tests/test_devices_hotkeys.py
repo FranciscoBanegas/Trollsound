@@ -7,7 +7,8 @@ from PyQt6.QtMultimedia import QAudioFormat
 
 from trollsound.devices import Endpoint, cable_family, endpoint_for
 from trollsound.hotkeys import (DEBOUNCE_NS, FIRST_HOTKEY_ID, MOD_ALT, MOD_CONTROL,
-                                MOD_NOREPEAT, MOD_SHIFT, WM_HOTKEY, Hotkeys,
+                                MOD_NOREPEAT, MOD_SHIFT, STOP_ACTION_ID, STOP_HOTKEY_ID,
+                                WM_HOTKEY, Hotkeys,
                                 parse_hotkey)
 from trollsound.storage import Macro
 
@@ -112,6 +113,20 @@ def test_native_registration_conflicts_dispatch_and_release(qtbot):
     hooks.dispatch(FIRST_HOTKEY_ID + 1)
     hooks.clear()
     assert api.unregistered == [(1234, FIRST_HOTKEY_ID)]
+    hooks.close()
+
+
+def test_stop_hotkey_registers_and_dispatches_independent_action(qtbot):
+    api = FakeHotkeyApi()
+    hooks = Hotkeys(api=api)
+    hooks.set_window(1234)
+    hooks.register([], "ctrl+alt+x")
+
+    assert hooks.statuses[STOP_ACTION_ID] == "Registrada"
+    assert api.registrations[0][1] == STOP_HOTKEY_ID
+    with qtbot.waitSignal(hooks.triggered) as signal:
+        hooks.dispatch(STOP_HOTKEY_ID)
+    assert signal.args == [STOP_ACTION_ID, hooks.generation]
     hooks.close()
 
 
